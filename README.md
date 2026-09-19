@@ -65,4 +65,25 @@ uv run data/download.py
 ```
 
 By default this downloads the latest 5 10-K filings for AAPL, MSFT, NVDA, AMZN, and GOOGL into year folders under `data/downloads/` and writes a `manifest.json`.
-Downloaded files are gitignored; the `data/` folder itself stays in git for the script and notes.
+Convert those HTML files to Markdown (same year layout) with:
+
+```bash
+cd backend
+uv run python -m ingest.to_markdown
+```
+
+Load the Markdown filings into `source_documents`:
+
+```bash
+cd backend
+uv run python -m ingest.load_documents
+```
+
+Chunk the original HTML (not the Markdown export) and write `document_chunks`:
+
+```bash
+cd backend
+uv run python -m ingest.chunk_and_embed
+```
+
+Downloaded and converted files are gitignored; the `data/` folder itself stays in git for the scripts and notes.

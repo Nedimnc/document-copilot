@@ -40,11 +40,53 @@ Keep `service_role` out of git, client bundles, and frontend env files.
 
 ## 4. Auth settings (email only)
 
-This app uses email auth only — no Google/SSO.
+This app uses email/password auth only — no Google/SSO. Signup happens in the React app against Supabase Auth. FastAPI never stores passwords; it only verifies the JWT.
 
-1. Dashboard → **Authentication** → **Providers**.
+Open your project: `https://supabase.com/dashboard/project/<your-ref>`
+
+### Providers
+
+1. Go to **Authentication → Sign In / Providers**.
 2. Leave **Email** enabled.
-3. For local dev, you may want **Authentication** → **Email** → disable "Confirm email" so sign-up works without inbox access (re-enable for production).
+3. Disable every other provider (Google, GitHub, SSO, etc.).
+4. Open the Email provider settings.
+5. For local development, turn **Confirm email** **off**. Otherwise signup creates a user but no session until the inbox link is clicked.
+6. Re-enable confirm-email before any real rollout.
+
+### URL configuration
+
+1. Go to **Authentication → URL Configuration**.
+2. Set **Site URL** to `http://localhost:5173`.
+3. Add these **Redirect URLs**:
+   - `http://localhost:5173`
+   - `http://localhost:5173/**`
+   - `http://localhost:5173/login`
+
+### Create a user
+
+Either:
+
+- Use the app: `http://localhost:5173/login` → **Need an account? Sign up**
+- Or dashboard: **Authentication → Users → Add user** (email + password, auto-confirm)
+
+After signup, `auth.users` gets a row and the `handle_new_user` trigger inserts a matching `public.profiles` row. Check **Table Editor → profiles**.
+
+### Frontend env
+
+`frontend/.env` needs the same **public** values as the backend (never the service-role key):
+
+```bash
+VITE_API_BASE_URL=http://localhost:8000
+VITE_SUPABASE_URL=https://<your-ref>.supabase.co
+VITE_SUPABASE_ANON_KEY=<anon or sb_publishable_ key>
+```
+
+### Quick check
+
+1. Start the backend (`uv run uvicorn app.main:app --reload` from `backend/`).
+2. Start the frontend (`pnpm dev` from `frontend/`).
+3. Sign up, then you should land on `/` and see `Backend verified <email>`.
+4. `GET http://127.0.0.1:8000/auth/me` with `Authorization: Bearer <access_token>` should return `{ "id", "email" }`.
 
 ## 5. Database schema management
 

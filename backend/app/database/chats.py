@@ -9,6 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import ChatMessage, ChatThread, MessageCitation
 
+# Chat rows are owned by CurrentUser.id. Every helper takes user_id so a
+# missing filter cannot leak another analyst's threads.
+
 
 async def create_thread(
     session: AsyncSession, *, user_id: UUID, title: str | None = None
@@ -35,6 +38,17 @@ async def get_thread(
         select(ChatThread).where(
             ChatThread.id == thread_id, ChatThread.user_id == user_id
         )
+    )
+    return result.scalar_one_or_none()
+
+
+async def get_thread_by_id(
+    session: AsyncSession, *, thread_id: UUID
+) -> ChatThread | None:
+    # Unscoped lookup so the API can return 404 vs 403. Do not use this
+    # result without an owner check.
+    result = await session.execute(
+        select(ChatThread).where(ChatThread.id == thread_id)
     )
     return result.scalar_one_or_none()
 

@@ -19,8 +19,8 @@ The most logical path is to build the backend first, then the frontend. The reas
 
 - [x] Initialize the FastAPI app and health-check endpoints
 - [x] Create the shared backend configuration module and fail-fast env validation
-- [ ] Set up Supabase Auth integration and bearer-token verification middleware/dependencies
-- [ ] Define the authenticated user context and rule that all chat actions are user-scoped
+- [x] Set up Supabase Auth integration and bearer-token verification middleware/dependencies
+- [x] Define the authenticated user context and rule that all chat actions are user-scoped
 - [x] Create the project structure for:
   - [x] app/api
   - [x] app/auth
@@ -49,14 +49,16 @@ The most logical path is to build the backend first, then the frontend. The reas
 
 ## Phase 3: ingestion pipeline
 
-- [ ] Build the SEC filing download flow for the curated corpus
-- [ ] Create parsing logic for the filing HTML/text extraction pipeline
-- [ ] Normalize document metadata and preserve page-level references
-- [ ] Chunk filings into retrieval-friendly segments with page provenance
+- [x] Build the SEC filing download flow for the curated corpus
+- [x] Create parsing logic for the filing HTML/text extraction pipeline
+- [x] Normalize document metadata and preserve page-level references
+- [x] Chunk filings into retrieval-friendly segments with page provenance
 - [ ] Generate embeddings for each chunk using the configured model
 - [ ] Store documents, chunks, embeddings, and metadata in Supabase/Postgres
 - [ ] Validate retrieval inputs with a small sample corpus before going wider
-- [ ] Add ingestion tests for parsing, chunking, and metadata integrity
+- [x] Add ingestion tests for parsing, chunking, and metadata integrity
+
+HTML → HybridChunker (`ingest.chunk_and_embed`) is written and unit-tested. Corpus load into `document_chunks` has not been run yet.
 
 ## Phase 4: retrieval and grounding
 
@@ -86,25 +88,27 @@ The most logical path is to build the backend first, then the frontend. The reas
 
 ## Phase 6: chat API and persistence
 
-- [ ] Build the thread creation and listing endpoints
-- [ ] Build the message history retrieval endpoints
-- [ ] Build the streaming chat endpoint with authenticated request validation
-- [ ] Persist user messages and assistant replies to the database
+- [x] Build the thread creation and listing endpoints
+- [x] Build the message history retrieval endpoints
+- [x] Build the streaming chat endpoint with authenticated request validation
+- [x] Persist user messages and assistant replies to the database
 - [ ] Persist citation records and referenced passages for later display
 - [ ] Confirm the answer contract is consistent with the frontend consumer expectations
 - [ ] Validate the API against sample analyst prompts from the client brief
 
+Stubbed vertical slice: `POST /chat/stream` emits an AI SDK UI message stream and saves both messages after the stream finishes. No retrieval, citations, or real LLM yet.
+
 ## Phase 7: frontend app shell and chat UI
 
-- [ ] Set up the Vite React SPA and app routing
-- [ ] Add the Supabase browser client and environment validation module
-- [ ] Create shared API helpers for bearer-token-authenticated calls
-- [ ] Build the login / auth flow using Driftwood email addresses
-- [ ] Build the thread list and conversation history UI
-- [ ] Build the chat composer and streaming message interface
+- [x] Set up the Vite React SPA and app routing
+- [x] Add the Supabase browser client and environment validation module
+- [x] Create shared API helpers for bearer-token-authenticated calls
+- [x] Build the login / auth flow using Driftwood email addresses
+- [x] Build the thread list and conversation history UI
+- [x] Build the chat composer and streaming message interface
 - [ ] Display citations, source filings, page references, and underlying passages
-- [ ] Add empty states, loading states, and error handling for invalid or unsupported questions
-- [ ] Ensure the frontend does not contain any privileged credentials or server-side logic
+- [x] Add empty states, loading states, and error handling for invalid or unsupported questions
+- [x] Ensure the frontend does not contain any privileged credentials or server-side logic
 
 ## Phase 8: end-to-end validation against the client brief
 - [ ] Test the core analyst questions from the brief with real corpus-backed answers

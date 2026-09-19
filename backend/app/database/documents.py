@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import DocumentChunk, SourceDocument
@@ -54,6 +54,14 @@ async def add_chunks(
     session.add_all(chunks)
     await session.flush()
     return chunks
+
+
+async def delete_chunks_for_document(
+    session: AsyncSession, document_id: UUID
+) -> None:
+    await session.execute(
+        delete(DocumentChunk).where(DocumentChunk.document_id == document_id)
+    )
 
 
 async def get_chunk(session: AsyncSession, chunk_id: UUID) -> DocumentChunk | None:

@@ -1,4 +1,4 @@
-"""SQLAlchemy models, session factory, and typed query helpers."""
+"""SQLAlchemy models, session factory, Supabase clients, and query helpers."""
 
 from app.database.models import Base
 

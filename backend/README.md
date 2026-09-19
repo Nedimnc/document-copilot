@@ -18,6 +18,8 @@ uv run uvicorn app.main:app --reload
 ```
 
 - Health: http://127.0.0.1:8000/health
+- Current user: http://127.0.0.1:8000/auth/me (`Authorization: Bearer <supabase_access_token>`)
+- Chat: `GET/POST /chat/threads`, `GET /chat/threads/{id}/messages`, `POST /chat/stream` (stubbed SSE)
 - Docs: http://127.0.0.1:8000/docs
 
 ## Migrations
