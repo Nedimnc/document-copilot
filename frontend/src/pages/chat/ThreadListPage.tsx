@@ -1,13 +1,25 @@
+import { Plus } from "lucide-react"
+import { useOutletContext } from "react-router-dom"
+
+import { Button } from "@/components/ui/button"
+import type { ChatOutletContext } from "@/pages/chat/ChatLayout"
+
 export function ThreadListPage() {
+  const { newChat, creating } = useOutletContext<ChatOutletContext>()
+
   return (
-    <main className="flex flex-1 items-center justify-center px-6 text-center">
-      <div>
-        <h1 className="text-xl font-medium text-zinc-900">Conversations</h1>
-        <p className="mt-2 max-w-sm text-sm text-zinc-500">
-          Create a thread from the sidebar, send a message, and you should see a
-          stubbed streamed reply. Reload the thread to confirm history was saved.
+    <div className="flex flex-1 items-center justify-center px-6 py-10 text-center">
+      <div className="max-w-md">
+        <h1 className="text-xl font-semibold">Document Copilot</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Ask questions about the SEC 10-K corpus and get answers cited to the exact
+          filing and page. Pick a past conversation from the sidebar, or start a new one.
         </p>
+        <Button className="mt-5" disabled={creating} onClick={newChat}>
+          <Plus className="size-4" />
+          {creating ? "Creating…" : "New chat"}
+        </Button>
       </div>
-    </main>
+    </div>
   )
 }

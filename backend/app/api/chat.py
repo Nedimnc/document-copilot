@@ -1,36 +1,30 @@
 from __future__ import annotations
 
-import asyncio
 from collections.abc import AsyncIterator
 from datetime import datetime
-from typing import Annotated, Literal
-from uuid import UUID, uuid4
+from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.chat_schemas import CitationResponse, MessageResponse, TextPart
 from app.auth.dependencies import get_current_user
 from app.auth.user import CurrentUser
-from app.chat.messages import UIMessageIn, last_user_text, ui_payload
-from app.chat.streaming import (
-    CHUNK_DELAY_SECONDS,
-    UI_MESSAGE_STREAM_HEADERS,
-    format_sse,
-    iter_stub_events,
-    stub_reply_text,
-)
+from app.chat.messages import UIMessageIn, last_user_text
+from app.chat.orchestrator import stream_chat_turn
+from app.chat.streaming import UI_MESSAGE_STREAM_HEADERS, format_sse
 from app.database.chats import (
-    create_message,
     create_thread,
-    get_thread,
     get_thread_by_id,
+    list_citations_for_thread,
     list_messages,
     list_threads,
 )
 from app.database.models import ChatMessage, ChatThread
-from app.database.session import get_db_session, get_session_factory
+from app.database.session import get_db_session
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -44,19 +38,6 @@ class ThreadResponse(BaseModel):
     title: str | None
     created_at: datetime
     updated_at: datetime
-
-
-class TextPart(BaseModel):
-    type: Literal["text"] = "text"
-    text: str
-
-
-class MessageResponse(BaseModel):
-    id: UUID
-    role: str
-    content: str
-    parts: list[TextPart]
-    created_at: datetime
 
 
 class StreamChatRequest(BaseModel):
@@ -84,12 +65,17 @@ def _thread_response(thread: ChatThread) -> ThreadResponse:
     )
 
 
-def _message_response(message: ChatMessage) -> MessageResponse:
+def _message_response(
+    message: ChatMessage,
+    *,
+    citations: list[CitationResponse] | None = None,
+) -> MessageResponse:
     return MessageResponse(
         id=message.id,
         role=message.role,
         content=message.content,
         parts=[TextPart(text=message.content)],
+        citations=citations or [],
         created_at=message.created_at,
     )
 
@@ -108,36 +94,6 @@ async def require_owned_thread(
             detail="You do not have access to this thread",
         )
     return thread
-
-
-async def persist_stub_turn(
-    *, user_id: UUID, thread_id: UUID, user_text: str, assistant_text: str
-) -> None:
-    factory = get_session_factory()
-    async with factory() as session:
-        thread = await get_thread(session, user_id=user_id, thread_id=thread_id)
-        if thread is None:
-            raise LookupError("thread not found")
-        if not thread.title:
-            thread.title = user_text[:80]
-
-        await create_message(
-            session,
-            user_id=user_id,
-            thread_id=thread_id,
-            role="user",
-            content=user_text,
-            payload=ui_payload(user_text),
-        )
-        await create_message(
-            session,
-            user_id=user_id,
-            thread_id=thread_id,
-            role="assistant",
-            content=assistant_text,
-            payload=ui_payload(assistant_text),
-        )
-        await session.commit()
 
 
 @router.get("/threads")
@@ -173,7 +129,19 @@ async def get_thread_messages(
     messages = await list_messages(
         session, user_id=current_user.id, thread_id=thread_id
     )
-    return [_message_response(message) for message in messages]
+    citations_by_message = await list_citations_for_thread(
+        session, user_id=current_user.id, thread_id=thread_id
+    )
+    return [
+        _message_response(
+            message,
+            citations=[
+                CitationResponse.from_record(record)
+                for record in citations_by_message.get(message.id, [])
+            ],
+        )
+        for message in messages
+    ]
 
 
 @router.post("/stream")
@@ -196,26 +164,21 @@ async def stream_chat(
         session, user_id=current_user.id, thread_id=thread_id
     )
 
-    assistant_text = stub_reply_text(user_text)
-    message_id = str(uuid4())
-
     async def generate() -> AsyncIterator[bytes]:
-        for event in iter_stub_events(message_id=message_id, text=assistant_text):
+        async for event in stream_chat_turn(
+            session,
+            user_id=current_user.id,
+            thread_id=thread_id,
+            user_text=user_text,
+            ui_messages=body.messages,
+        ):
             if await request.is_disconnected():
                 return
             yield format_sse(event)
-            if CHUNK_DELAY_SECONDS:
-                await asyncio.sleep(CHUNK_DELAY_SECONDS)
 
         if await request.is_disconnected():
             return
 
-        await persist_stub_turn(
-            user_id=current_user.id,
-            thread_id=thread_id,
-            user_text=user_text,
-            assistant_text=assistant_text,
-        )
         yield format_sse("[DONE]")
 
     return StreamingResponse(

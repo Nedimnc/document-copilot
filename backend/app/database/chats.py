@@ -1,13 +1,20 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from dataclasses import dataclass
+from datetime import UTC, date, datetime
 from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database.models import ChatMessage, ChatThread, MessageCitation
+from app.database.models import (
+    ChatMessage,
+    ChatThread,
+    DocumentChunk,
+    MessageCitation,
+    SourceDocument,
+)
 
 # Chat rows are owned by CurrentUser.id. Every helper takes user_id so a
 # missing filter cannot leak another analyst's threads.
@@ -118,6 +125,62 @@ async def create_citations(
         session.add(citation)
     await session.flush()
     return citations
+
+
+@dataclass(frozen=True, slots=True)
+class CitationRecord:
+    id: UUID
+    message_id: UUID
+    chunk_id: UUID
+    document_id: UUID
+    sort_order: int
+    excerpt: str
+    page: int | None
+    ticker: str
+    company_name: str
+    filing_type: str
+    fiscal_year: int
+    filing_date: date
+    source_url: str
+    section: str | None
+
+
+async def list_citations_for_thread(
+    session: AsyncSession, *, user_id: UUID, thread_id: UUID
+) -> dict[UUID, list[CitationRecord]]:
+    thread = await get_thread(session, user_id=user_id, thread_id=thread_id)
+    if thread is None:
+        raise LookupError("thread not found")
+
+    result = await session.execute(
+        select(MessageCitation, SourceDocument, DocumentChunk)
+        .join(SourceDocument, MessageCitation.document_id == SourceDocument.id)
+        .join(DocumentChunk, MessageCitation.chunk_id == DocumentChunk.id)
+        .join(ChatMessage, MessageCitation.message_id == ChatMessage.id)
+        .where(ChatMessage.thread_id == thread.id)
+        .order_by(MessageCitation.message_id.asc(), MessageCitation.sort_order.asc())
+    )
+    grouped: dict[UUID, list[CitationRecord]] = {}
+    for citation, document, chunk in result.all():
+        grouped.setdefault(citation.message_id, []).append(
+            CitationRecord(
+                id=citation.id,
+                message_id=citation.message_id,
+                chunk_id=citation.chunk_id,
+                document_id=citation.document_id,
+                sort_order=citation.sort_order,
+                excerpt=citation.excerpt,
+                page=citation.page,
+                ticker=document.ticker,
+                company_name=document.company_name,
+                filing_type=document.filing_type,
+                fiscal_year=document.fiscal_year,
+                filing_date=document.filing_date,
+                source_url=document.source_url,
+                section=chunk.section,
+            )
+        )
+    return grouped
 
 
 async def list_citations(

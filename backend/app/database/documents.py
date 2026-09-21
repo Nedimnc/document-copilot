@@ -2,10 +2,75 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import DocumentChunk, SourceDocument
+
+
+async def search_chunk_ids_semantic(
+    session: AsyncSession,
+    *,
+    query_embedding: list[float],
+    limit: int,
+) -> list[UUID]:
+    distance = DocumentChunk.embedding.cosine_distance(query_embedding)
+    result = await session.execute(
+        select(DocumentChunk.id).order_by(distance).limit(limit)
+    )
+    return list(result.scalars())
+
+
+async def search_chunk_ids_lexical(
+    session: AsyncSession,
+    *,
+    query: str,
+    limit: int,
+) -> list[UUID]:
+    cleaned = query.strip()
+    if not cleaned:
+        return []
+    ts_query = func.plainto_tsquery("english", cleaned)
+    rank = func.ts_rank_cd(DocumentChunk.search_vector, ts_query)
+    result = await session.execute(
+        select(DocumentChunk.id)
+        .where(DocumentChunk.search_vector.op("@@")(ts_query))
+        .order_by(rank.desc())
+        .limit(limit)
+    )
+    return list(result.scalars())
+
+
+async def load_chunks_with_documents(
+    session: AsyncSession, chunk_ids: list[UUID]
+) -> list[tuple[DocumentChunk, SourceDocument]]:
+    if not chunk_ids:
+        return []
+    result = await session.execute(
+        select(DocumentChunk, SourceDocument)
+        .join(SourceDocument, DocumentChunk.document_id == SourceDocument.id)
+        .where(DocumentChunk.id.in_(chunk_ids))
+    )
+    rows = list(result.all())
+    by_chunk_id = {chunk.id: (chunk, document) for chunk, document in rows}
+    return [by_chunk_id[chunk_id] for chunk_id in chunk_ids if chunk_id in by_chunk_id]
+
+
+async def get_adjacent_chunks(
+    session: AsyncSession,
+    *,
+    document_id: UUID,
+    chunk_index: int,
+) -> list[DocumentChunk]:
+    result = await session.execute(
+        select(DocumentChunk)
+        .where(
+            DocumentChunk.document_id == document_id,
+            DocumentChunk.chunk_index.in_([chunk_index - 1, chunk_index + 1]),
+        )
+        .order_by(DocumentChunk.chunk_index.asc())
+    )
+    return list(result.scalars())
 
 
 async def add_source_document(

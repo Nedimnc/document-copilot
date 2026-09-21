@@ -1,4 +1,4 @@
-from app.chat.streaming import chunk_text, format_sse, iter_stub_events, stub_reply_text
+from app.chat.streaming import chunk_text, format_sse, iter_text_part_events
 
 
 def test_format_sse_encodes_json_and_done():
@@ -6,9 +6,9 @@ def test_format_sse_encodes_json_and_done():
     assert format_sse("[DONE]") == b"data: [DONE]\n\n"
 
 
-def test_iter_stub_events_follows_ui_message_protocol():
+def test_iter_text_part_events_follows_ui_message_protocol():
     events = list(
-        iter_stub_events(message_id="msg-1", text="Hello there", text_id="txt")
+        iter_text_part_events(message_id="msg-1", text="Hello there", text_id="txt")
     )
 
     assert events[0] == {"type": "start", "messageId": "msg-1"}
@@ -20,10 +20,6 @@ def test_iter_stub_events_follows_ui_message_protocol():
     assert "".join(
         event["delta"] for event in events if event["type"] == "text-delta"
     ) == "Hello there"
-
-
-def test_stub_reply_mentions_the_question():
-    assert "What is Form 10-K?" in stub_reply_text("What is Form 10-K?")
 
 
 def test_chunk_text_splits_evenly():

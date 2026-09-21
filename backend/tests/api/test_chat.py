@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 from uuid import UUID
 
 from fastapi.testclient import TestClient
@@ -104,6 +104,10 @@ def test_list_messages_for_owner(valid_env):
             "app.api.chat.list_messages",
             AsyncMock(return_value=[_message(role="user", content="hello")]),
         ),
+        patch(
+            "app.api.chat.list_citations_for_thread",
+            AsyncMock(return_value={}),
+        ),
     ):
         response = _client().get(f"/chat/threads/{THREAD_ID}/messages")
 
@@ -111,6 +115,7 @@ def test_list_messages_for_owner(valid_env):
     body = response.json()[0]
     assert body["role"] == "user"
     assert body["parts"] == [{"type": "text", "text": "hello"}]
+    assert body["citations"] == []
 
 
 def test_stream_403_for_other_users_thread(valid_env):
@@ -146,15 +151,17 @@ def test_stream_404_for_missing_thread(valid_env):
     assert response.status_code == 404
 
 
-def test_stream_emits_ui_events_and_persists(valid_env):
-    persist = AsyncMock()
-    session_factory = MagicMock()
+async def _fake_stream_turn(*_args, **_kwargs):
+    from app.chat.streaming import iter_text_part_events
 
+    for event in iter_text_part_events(message_id="msg-test", text="Answer [1]."):
+        yield event
+
+
+def test_stream_emits_ui_events_and_persists(valid_env):
     with (
         patch("app.api.chat.get_thread_by_id", AsyncMock(return_value=_thread())),
-        patch("app.api.chat.CHUNK_DELAY_SECONDS", 0),
-        patch("app.api.chat.persist_stub_turn", persist),
-        patch("app.api.chat.get_session_factory", return_value=session_factory),
+        patch("app.api.chat.stream_chat_turn", _fake_stream_turn),
     ):
         response = _client().post(
             "/chat/stream",
@@ -177,7 +184,3 @@ def test_stream_emits_ui_events_and_persists(valid_env):
     assert 'data: {"type":"text-delta"' in response.text
     assert 'data: {"type":"finish"}' in response.text
     assert "data: [DONE]" in response.text
-    persist.assert_awaited_once()
-    assert persist.await_args.kwargs["user_text"] == "What is a 10-K?"
-    assert persist.await_args.kwargs["thread_id"] == THREAD_ID
-    session_factory.assert_not_called()

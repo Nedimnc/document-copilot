@@ -1,14 +1,18 @@
 import { useChat } from "@ai-sdk/react"
-import { DefaultChatTransport, type UIMessage } from "ai"
-import { useEffect, useMemo, useState } from "react"
+import type { UIMessage } from "ai"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useOutletContext, useParams } from "react-router-dom"
 
+import { CitationPanelProvider } from "@/components/chat/CitationPanel"
 import { Composer } from "@/components/chat/Composer"
+import { EmptyState } from "@/components/chat/EmptyState"
 import { MessageList } from "@/components/chat/MessageList"
+import { PipelineStatusBar } from "@/components/chat/PipelineStatus"
+import { Skeleton } from "@/components/ui/skeleton"
 import { listMessages } from "@/lib/api"
-import { getAccessToken } from "@/lib/auth"
-import { toUIMessage } from "@/lib/chat"
-import { env } from "@/lib/env"
+import type { MessageCitation } from "@/lib/citations"
+import { citationsFromMessages, toUIMessage, visibleChatMessages } from "@/lib/chat"
+import { createChatTransport, type PipelineStatus } from "@/lib/chatTransport"
 import { ApiError } from "@/lib/http"
 import type { ChatOutletContext } from "@/pages/chat/ChatLayout"
 
@@ -20,8 +24,31 @@ export function ChatPage() {
   return <ThreadLoader key={threadId} threadId={threadId} />
 }
 
+function LoadingSkeleton() {
+  return (
+    <div className="flex-1 overflow-y-auto px-4 py-6">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+        <div className="flex justify-end">
+          <Skeleton className="h-10 w-64 rounded-2xl" />
+        </div>
+        <div className="flex gap-3">
+          <Skeleton className="size-7 shrink-0 rounded-md" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-2/3" />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ThreadLoader({ threadId }: { threadId: string }) {
   const [initialMessages, setInitialMessages] = useState<UIMessage[] | null>(null)
+  const [initialCitations, setInitialCitations] = useState<
+    Record<string, MessageCitation[]>
+  >({})
   const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -30,6 +57,7 @@ function ThreadLoader({ threadId }: { threadId: string }) {
       .then((messages) => {
         if (!cancelled) {
           setInitialMessages(messages.map(toUIMessage))
+          setInitialCitations(citationsFromMessages(messages))
         }
       })
       .catch((error: unknown) => {
@@ -53,18 +81,14 @@ function ThreadLoader({ threadId }: { threadId: string }) {
 
   if (loadError) {
     return (
-      <main className="flex flex-1 items-center justify-center px-6 text-sm text-red-700">
+      <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-muted-foreground">
         {loadError}
-      </main>
+      </div>
     )
   }
 
   if (initialMessages === null) {
-    return (
-      <main className="flex flex-1 items-center justify-center text-sm text-zinc-500">
-        Loading conversation…
-      </main>
-    )
+    return <LoadingSkeleton />
   }
 
   return (
@@ -72,6 +96,7 @@ function ThreadLoader({ threadId }: { threadId: string }) {
       key={threadId}
       threadId={threadId}
       initialMessages={initialMessages}
+      initialCitations={initialCitations}
     />
   )
 }
@@ -79,49 +104,97 @@ function ThreadLoader({ threadId }: { threadId: string }) {
 function ChatWindow({
   threadId,
   initialMessages,
+  initialCitations,
 }: {
   threadId: string
   initialMessages: UIMessage[]
+  initialCitations: Record<string, MessageCitation[]>
 }) {
   const { refreshThreads } = useOutletContext<ChatOutletContext>()
-  const transport = useMemo(
-    () =>
-      new DefaultChatTransport({
-        api: `${env.apiBaseUrl}/chat/stream`,
-        headers: async () => {
-          const token = await getAccessToken()
-          return token ? { Authorization: `Bearer ${token}` } : {}
-        },
-      }),
-    [],
-  )
+  const [pipelineStatus, setPipelineStatus] = useState<PipelineStatus | null>(null)
+  const [citationsByMessageId, setCitationsByMessageId] =
+    useState<Record<string, MessageCitation[]>>(initialCitations)
 
-  const { messages, sendMessage, status, error } = useChat({
+  const transport = useMemo(() => createChatTransport(setPipelineStatus), [])
+
+  const { messages, sendMessage, setMessages, status, error, stop } = useChat({
     id: threadId,
     messages: initialMessages,
     transport,
   })
 
+  const syncFromServer = useCallback(async () => {
+    const stored = await listMessages(threadId)
+    setMessages(stored.map(toUIMessage))
+    setCitationsByMessageId(citationsFromMessages(stored))
+  }, [threadId, setMessages])
+
+  const prevStatus = useRef(status)
+
   useEffect(() => {
-    if (status === "ready" && messages.length > initialMessages.length) {
-      void refreshThreads()
+    setCitationsByMessageId(initialCitations)
+  }, [initialCitations, threadId])
+
+  useEffect(() => {
+    const streamEnded = prevStatus.current !== "ready" && status === "ready"
+    prevStatus.current = status
+
+    if (status === "ready") {
+      setPipelineStatus(null)
     }
-  }, [initialMessages.length, messages.length, refreshThreads, status])
+
+    if (!streamEnded) {
+      return
+    }
+
+    void syncFromServer()
+    void refreshThreads()
+  }, [refreshThreads, status, syncFromServer])
+
+  const busy = status === "submitted" || status === "streaming"
+  const isEmpty = visibleChatMessages(messages, status).length === 0
 
   return (
-    <main className="flex min-h-0 flex-1 flex-col">
-      <MessageList messages={messages} status={status} />
+    <CitationPanelProvider>
+      <div className="flex min-h-0 flex-1 flex-col">
+        {isEmpty && !busy ? (
+        <EmptyState onPick={(question) => void sendMessage({ text: question })} />
+      ) : (
+        <MessageList
+          messages={messages}
+          status={status}
+          citationsByMessageId={citationsByMessageId}
+        />
+      )}
+
+      <PipelineStatusBar
+        status={
+          pipelineStatus ??
+          (status === "submitted"
+            ? { phase: "waiting", label: "Waiting for response…" }
+            : null)
+        }
+      />
+
       {error ? (
-        <p className="px-4 text-sm text-red-700" role="alert">
-          {error.message}
-        </p>
+        <div className="px-4">
+          <p
+            className="mx-auto w-full max-w-3xl text-sm text-destructive"
+            role="alert"
+          >
+            {error.message}
+          </p>
+        </div>
       ) : null}
+
       <Composer
-        disabled={status === "submitted" || status === "streaming"}
+        busy={busy}
+        onStop={stop}
         onSend={async (text) => {
           await sendMessage({ text })
         }}
       />
-    </main>
+      </div>
+    </CitationPanelProvider>
   )
 }

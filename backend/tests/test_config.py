@@ -14,6 +14,7 @@ def test_settings_parses_required_values(valid_env):
     assert settings.supabase_service_role_key == "service-role-key"
     assert settings.database_url == "postgresql://user:pass@localhost:5432/app"
     assert settings.openai_api_key == "sk-test-key"
+    assert settings.openai_chat_model == "gpt-4o-mini"
     assert settings.openai_embedding_model == "text-embedding-3-small"
     assert settings.openai_embedding_dimensions == 1536
     assert settings.allowed_origins == [
@@ -39,6 +40,7 @@ def test_settings_requires_missing_values(monkeypatch):
         "SUPABASE_SERVICE_ROLE_KEY",
         "DATABASE_URL",
         "OPENAI_API_KEY",
+        "OPENAI_CHAT_MODEL",
         "OPENAI_EMBEDDING_MODEL",
         "OPENAI_EMBEDDING_DIMENSIONS",
         "ALLOWED_ORIGINS",

@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useState } from "react"
-import { Outlet, useNavigate } from "react-router-dom"
+import { Outlet, useNavigate, useParams } from "react-router-dom"
 
-import { ThreadSidebar } from "@/components/chat/ThreadSidebar"
+import { AppSidebar } from "@/components/layout/AppSidebar"
+import { Separator } from "@/components/ui/separator"
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar"
 import { createThread, listThreads } from "@/lib/api"
 import { signOut } from "@/lib/auth"
 import type { ChatThread } from "@/lib/chat"
@@ -9,10 +15,13 @@ import { supabase } from "@/lib/supabase"
 
 export type ChatOutletContext = {
   refreshThreads: () => Promise<void>
+  newChat: () => void
+  creating: boolean
 }
 
 export function ChatLayout() {
   const navigate = useNavigate()
+  const { threadId } = useParams<{ threadId: string }>()
   const [threads, setThreads] = useState<ChatThread[]>([])
   const [email, setEmail] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -50,12 +59,19 @@ export function ChatLayout() {
     }
   }
 
+  const activeThread = threads.find((thread) => thread.id === threadId)
+  const heading = activeThread?.title?.trim() || "Conversations"
+
   return (
-    <div className="flex min-h-svh">
-      <ThreadSidebar
+    // Lock the shell to the viewport so the message list scrolls internally and
+    // the composer stays pinned — otherwise the page itself grows and the input
+    // slides below the fold while an answer streams in.
+    <SidebarProvider className="h-svh overflow-hidden">
+      <AppSidebar
         threads={threads}
         email={email}
         creating={creating}
+        activeThreadId={threadId}
         onCreate={() => {
           void onCreate()
         }}
@@ -63,14 +79,32 @@ export function ChatLayout() {
           void signOut()
         }}
       />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <SidebarInset className="min-h-0">
+        <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
+          <SidebarTrigger className="-ml-1" />
+          <Separator orientation="vertical" className="mr-1 data-[orientation=vertical]:h-4" />
+          <span className="truncate text-sm font-medium">{heading}</span>
+        </header>
         {error ? (
-          <p className="border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+          <p
+            className="border-b border-destructive/30 bg-destructive/10 px-4 py-2 text-sm text-destructive"
+            role="alert"
+          >
             {error}
           </p>
         ) : null}
-        <Outlet context={{ refreshThreads } satisfies ChatOutletContext} />
-      </div>
-    </div>
+        <Outlet
+          context={
+            {
+              refreshThreads,
+              creating,
+              newChat: () => {
+                void onCreate()
+              },
+            } satisfies ChatOutletContext
+          }
+        />
+      </SidebarInset>
+    </SidebarProvider>
   )
 }

@@ -29,7 +29,9 @@ document-copilot/
 ├── README.md           # this file
 ├── data/               # local corpus + download script (payloads gitignored)
 ├── docs/
-│   └── client-brief.md # the client one-pager
+│   ├── architecture.md # system design (as built)
+│   ├── client-brief.md # the client one-pager
+│   └── todo.md         # implementation checklist
 ├── backend/            # FastAPI service
 └── frontend/           # React SPA (Vite)
 ```
@@ -85,5 +87,12 @@ Chunk the original HTML (not the Markdown export) and write `document_chunks`:
 cd backend
 uv run python -m ingest.chunk_and_embed
 ```
+
+Ingestion uses Docling with Markdown-style table serialization in chunks so citation excerpts stay readable. Re-chunking an existing corpus replaces all `document_chunks` rows (new UUIDs and embeddings). **`message_citations.chunk_id` uses `ON DELETE RESTRICT`**, so you cannot delete chunks that pilot chat history still references. Safe refresh options:
+
+1. **Empty / dev database:** run `uv run python -m ingest.chunk_and_embed --force` for the full manifest after `load_documents`.
+2. **Database with chat history:** archive or truncate dependent citation/message rows first, or refresh only on a new Supabase project and point staging at it.
+
+After a full re-chunk, re-run `uv run python -m ingest._validate_phase3` and update any hard-coded chunk count expectations in that script.
 
 Downloaded and converted files are gitignored; the `data/` folder itself stays in git for the scripts and notes.

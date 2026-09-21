@@ -10,7 +10,6 @@
 
     /* Bundler mode */
     "strict": true,
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     },

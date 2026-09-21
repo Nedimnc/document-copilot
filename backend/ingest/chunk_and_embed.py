@@ -39,6 +39,7 @@ from ingest.chunks import (
     doc_chunk_to_row,
     should_keep_chunk,
 )
+from ingest.docling_chunking import MarkdownTableChunkingSerializerProvider
 from ingest.paths import load_source_manifest
 
 REPO_ROOT = _BACKEND_ROOT.parent
@@ -62,7 +63,11 @@ def build_chunker(model: str) -> HybridChunker:
         tokenizer=tiktoken.encoding_for_model(model),
         max_tokens=MAX_EMBED_TOKENS,
     )
-    return HybridChunker(tokenizer=tokenizer, merge_peers=True)
+    return HybridChunker(
+        tokenizer=tokenizer,
+        merge_peers=True,
+        serializer_provider=MarkdownTableChunkingSerializerProvider(),
+    )
 
 
 def convert_html(converter: DocumentConverter, html_path: Path) -> Any:

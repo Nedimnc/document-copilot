@@ -1,52 +1,60 @@
 import { useEffect, useRef } from "react"
 import type { UIMessage } from "ai"
 
-import { messageText } from "@/lib/chat"
+import { Message } from "@/components/chat/Message"
+import type { MessageCitation } from "@/lib/citations"
+import { visibleChatMessages, type ChatStatus } from "@/lib/chat"
+
+const STICK_THRESHOLD_PX = 80
 
 export function MessageList({
   messages,
   status,
+  citationsByMessageId,
 }: {
   messages: UIMessage[]
-  status: "submitted" | "streaming" | "ready" | "error"
+  status: ChatStatus
+  citationsByMessageId: Record<string, MessageCitation[]>
 }) {
-  const bottom = useRef<HTMLDivElement>(null)
+  const container = useRef<HTMLDivElement>(null)
+  // Follow new content only while the user is already near the bottom. Once they
+  // scroll up to read, we stop yanking them back down until they return.
+  const stick = useRef(true)
 
-  useEffect(() => {
-    bottom.current?.scrollIntoView({ block: "end" })
-  }, [messages, status])
-
-  if (messages.length === 0 && status === "ready") {
-    return (
-      <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-zinc-500">
-        Ask a question. The reply is stubbed until retrieval is wired.
-      </div>
-    )
+  function onScroll() {
+    const el = container.current
+    if (!el) return
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    stick.current = distanceFromBottom < STICK_THRESHOLD_PX
   }
 
+  useEffect(() => {
+    const el = container.current
+    if (el && stick.current) {
+      el.scrollTop = el.scrollHeight
+    }
+  }, [messages, status, citationsByMessageId])
+
+  const visibleMessages = visibleChatMessages(messages, status)
+  const waiting = status === "submitted" || status === "streaming"
+
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-6">
-      <ol className="mx-auto flex max-w-2xl flex-col gap-4">
-        {messages.map((message) => {
-          const isUser = message.role === "user"
-          return (
-            <li
-              key={message.id}
-              className={`max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
-                isUser
-                  ? "self-end bg-zinc-900 text-white"
-                  : "self-start bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200"
-              }`}
-            >
-              {messageText(message) || (isUser ? "" : "…")}
-            </li>
-          )
-        })}
+    <div
+      ref={container}
+      onScroll={onScroll}
+      className="min-h-0 flex-1 overflow-y-auto px-4 py-6"
+    >
+      <ol className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+        {visibleMessages.map((message, index) => (
+          <li key={message.id}>
+            <Message
+              message={message}
+              citations={citationsByMessageId[message.id] ?? []}
+              isStreamingLast={waiting && index === visibleMessages.length - 1}
+            />
+          </li>
+        ))}
       </ol>
-      {status === "submitted" || status === "streaming" ? (
-        <p className="mx-auto mt-3 max-w-2xl text-sm text-zinc-500">Streaming…</p>
-      ) : null}
-      <div ref={bottom} />
     </div>
   )
 }
