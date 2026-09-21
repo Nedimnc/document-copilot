@@ -51,11 +51,99 @@ You also need accounts/keys for external services once the app is wired up. Star
 
 ## Running locally
 
-To be added during the build. Setup guides:
+You run **two processes**: FastAPI on port **8000** and the Vite dev server on port **5173**. Both talk to the same **Supabase** project (Auth + Postgres). Chat also needs an **OpenAI** key and a **loaded corpus** (`document_chunks` with embeddings). If you are joining an existing team project, ask for env values and skip ingestion; otherwise follow [Supabase setup](docs/guides/supabase-setup.md) and [Sample SEC data](#sample-sec-data) below.
 
-- [Supabase](docs/guides/supabase-setup.md) — account, hosted project (dashboard or CLI)
-- [Backend](docs/guides/backend-setup.md)
-- [Frontend](docs/guides/frontend-setup.md)
+### 1. One-time setup
+
+**Supabase project** — create a project, run migrations, enable email auth, and set Auth redirect URLs to include `http://localhost:5173`. Step-by-step: [docs/guides/supabase-setup.md](docs/guides/supabase-setup.md).
+
+**Backend environment** — from the repo root:
+
+```bash
+cd backend
+cp .env.example .env   # Windows: copy .env.example .env
+```
+
+Edit `backend/.env` with:
+
+- Supabase URL and keys (`SUPABASE_*`)
+- `DATABASE_URL` — **direct** Postgres host (`db.<ref>.supabase.co`), not the pooler URL
+- `OPENAI_API_KEY` and model settings (see `.env.example`)
+- `ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173`
+
+Install Python deps and apply schema:
+
+```bash
+cd backend
+uv sync
+uv run alembic upgrade head
+```
+
+**Frontend environment**:
+
+```bash
+cd frontend
+cp .env.example .env   # Windows: copy .env.example .env
+```
+
+Edit `frontend/.env`:
+
+- `VITE_API_BASE_URL=http://localhost:8000`
+- `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` — same Supabase project as the backend (anon key only)
+
+Install frontend deps:
+
+```bash
+cd frontend
+pnpm install
+```
+
+**Corpus** — the app will sign in and load threads, but answers need ingested filings in Supabase. Either use a shared dev database that already has chunks, or run the [Sample SEC data](#sample-sec-data) pipeline once (`download` → `to_markdown` → `load_documents` → `chunk_and_embed`).
+
+### 2. Start the app (every day)
+
+Use **two terminals**.
+
+**Terminal 1 — API:**
+
+```bash
+cd backend
+uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+**Terminal 2 — UI:**
+
+```bash
+cd frontend
+pnpm dev
+```
+
+Then open **http://localhost:5173**, sign in with email (Supabase), and start a chat.
+
+### 3. Quick checks
+
+| Check | URL / command | Expected |
+| ----- | ------------- | -------- |
+| API health | http://127.0.0.1:8000/health | `{"status":"ok"}` |
+| API docs | http://127.0.0.1:8000/docs | OpenAPI UI |
+| Backend tests | `cd backend && uv run pytest -m "not integration" -q` | All pass |
+| Frontend types | `cd frontend && pnpm exec tsc -b --noEmit` | No errors |
+
+**Optional — backend smoke script** (retrieval + LLM stream in the terminal, no browser):
+
+```bash
+cd backend
+uv run python smoke_assistant.py
+```
+
+### 4. Common issues
+
+- **CORS errors in the browser** — add your frontend origin to `ALLOWED_ORIGINS` in `backend/.env` and restart Uvicorn.
+- **Auth redirect / magic link fails** — in Supabase Dashboard → Authentication → URL configuration, set Site URL and redirect URLs to include `http://localhost:5173`.
+- **Empty or “no evidence” answers** — corpus not loaded; run ingestion or point `DATABASE_URL` at a project that already has `document_chunks`.
+- **Migration errors** — confirm `DATABASE_URL` uses the direct connection string; see [backend setup](docs/guides/backend-setup.md).
+
+More detail: [backend setup](docs/guides/backend-setup.md), [frontend setup](docs/guides/frontend-setup.md), [architecture](docs/architecture.md).
 
 ## Sample SEC data
 
