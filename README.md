@@ -25,9 +25,35 @@ Full brief: [docs/client-brief.md](docs/client-brief.md)
 
 High-level map of how the analyst UI, API, corpus, and external services connect. Deeper design notes (chat turn sequence, modules, data model): [docs/architecture.md](docs/architecture.md).
 
-<p align="center">
-  <img src="docs/assets/architecture.svg" alt="Document Copilot architecture: React SPA and Railway frontend/API, Supabase Auth and Postgres with hybrid retrieval, OpenAI for chat and embeddings, and offline SEC ingestion into document_chunks" width="920" />
-</p>
+```mermaid
+flowchart TB
+    subgraph browser [Browser]
+        spa[React SPA]
+    end
+
+    subgraph railway [Railway - planned]
+        fe[Static frontend]
+        be[FastAPI + Uvicorn]
+    end
+
+    subgraph supabase [Supabase]
+        auth[Auth email JWT]
+        db[(Postgres)]
+    end
+
+    openai[OpenAI chat + embeddings]
+    local[data/ SEC HTML corpus]
+
+    spa -->|JWT| auth
+    spa -->|REST + SSE| be
+    be -->|verify JWT| auth
+    be -->|SQLAlchemy async| db
+    be -->|chat + embed| openai
+
+    local -->|CLI ingest| db
+    ingest[ingest.* offline] --> openai
+    ingest --> db
+```
 
 ## Repo layout
 
