@@ -2,6 +2,8 @@
 
 An internal AI chatbot that lets analysts query a corpus of documents in plain English and get sourced, citable answers.
 
+![Document Copilot chat: sidebar of conversations, a grounded NVIDIA answer with inline citations, and a collapsible Sources list](docs/assets/ui.png)
+
 ## The client
 
 **Driftwood Capital** — fictional independent investment research firm. Their analysts spend half their week reading 10-Ks and 10-Qs before they can produce any original analysis. Document Copilot eats that intake work so they can skip straight to insight.
