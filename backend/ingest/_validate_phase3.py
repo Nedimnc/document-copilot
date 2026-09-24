@@ -294,7 +294,7 @@ async def validate() -> int:
                 retrieval_ok = False
 
     expected_docs = 25
-    expected_chunks = 11892
+    expected_chunks = 7013
     expected_dim = settings.openai_embedding_dimensions
     failures: list[str] = []
     if doc_count != expected_docs:

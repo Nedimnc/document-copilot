@@ -8,7 +8,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
-import { createThread, listThreads } from "@/lib/api"
+import { createThread, deleteThread, listThreads } from "@/lib/api"
 import { signOut } from "@/lib/auth"
 import type { ChatThread } from "@/lib/chat"
 import { supabase } from "@/lib/supabase"
@@ -26,6 +26,7 @@ export function ChatLayout() {
   const [email, setEmail] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const refreshThreads = useCallback(async () => {
     try {
@@ -59,6 +60,23 @@ export function ChatLayout() {
     }
   }
 
+  async function onDelete(thread: ChatThread): Promise<boolean> {
+    setDeleting(true)
+    try {
+      await deleteThread(thread.id)
+      await refreshThreads()
+      if (threadId === thread.id) {
+        navigate("/")
+      }
+      return true
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not delete that chat")
+      return false
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const activeThread = threads.find((thread) => thread.id === threadId)
   const heading = activeThread?.title?.trim() || "Conversations"
 
@@ -71,10 +89,12 @@ export function ChatLayout() {
         threads={threads}
         email={email}
         creating={creating}
+        deleting={deleting}
         activeThreadId={threadId}
         onCreate={() => {
           void onCreate()
         }}
+        onDelete={onDelete}
         onSignOut={() => {
           void signOut()
         }}

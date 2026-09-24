@@ -17,6 +17,10 @@ export function createThread(title?: string) {
   return api.post<ChatThread>("/chat/threads", { title })
 }
 
+export function deleteThread(threadId: string) {
+  return api.delete<void>(`/chat/threads/${threadId}`)
+}
+
 export function listMessages(threadId: string) {
   return api.get<StoredChatMessage[]>(`/chat/threads/${threadId}/messages`)
 }

@@ -21,6 +21,14 @@ Full brief: [docs/client-brief.md](docs/client-brief.md)
 | Hosting            | Railway                                              |
 | LLM + embeddings   | OpenAI                                               |
 
+## Architecture
+
+High-level map of how the analyst UI, API, corpus, and external services connect. Deeper design notes (chat turn sequence, modules, data model): [docs/architecture.md](docs/architecture.md).
+
+<p align="center">
+  <img src="docs/assets/architecture.svg" alt="Document Copilot architecture: React SPA and Railway frontend/API, Supabase Auth and Postgres with hybrid retrieval, OpenAI for chat and embeddings, and offline SEC ingestion into document_chunks" width="920" />
+</p>
+
 ## Repo layout
 
 ```text
@@ -144,6 +152,16 @@ uv run python smoke_assistant.py
 - **Migration errors** — confirm `DATABASE_URL` uses the direct connection string; see [backend setup](docs/guides/backend-setup.md).
 
 More detail: [backend setup](docs/guides/backend-setup.md), [frontend setup](docs/guides/frontend-setup.md), [architecture](docs/architecture.md).
+
+## Deploying to Railway
+
+Two services (backend + frontend), Supabase unchanged. Step-by-step: [docs/guides/railway-deployment.md](docs/guides/railway-deployment.md). Config files: `backend/railway.toml`, `frontend/railway.toml`.
+
+Pilot checklist (Phase 8): [docs/guides/pilot-validation.md](docs/guides/pilot-validation.md).
+
+## Second product (Fundamentals Lab)
+
+Separate from Document Copilot—screening, charts, criteria-based ratings. Planning docs: [docs/v2/README.md](docs/v2/README.md). Repo seed checklist: [v2-scaffold/README.md](v2-scaffold/README.md).
 
 ## Sample SEC data
 

@@ -176,6 +176,7 @@ Embeddings: **1536** dimensions (`text-embedding-3-small` unless config changes 
 |--------|------|------|
 | GET | `/chat/threads` | Bearer |
 | POST | `/chat/threads` | Bearer |
+| DELETE | `/chat/threads/{id}` | Bearer + owner |
 | GET | `/chat/threads/{id}/messages` | Bearer + owner |
 | POST | `/chat/stream` | Bearer + owner |
 

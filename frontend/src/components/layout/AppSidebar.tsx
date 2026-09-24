@@ -1,7 +1,17 @@
 import { FileText, Plus } from "lucide-react"
-import { NavLink } from "react-router-dom"
+import { useState } from "react"
 
+import { ThreadItem } from "@/components/layout/ThreadItem"
 import { UserMenu } from "@/components/layout/UserMenu"
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import {
   Sidebar,
@@ -12,35 +22,34 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar"
-import type { ChatThread } from "@/lib/chat"
+import { threadLabel, type ChatThread } from "@/lib/chat"
 import { groupThreads } from "@/lib/threadGroups"
-
-function threadLabel(thread: ChatThread): string {
-  return thread.title?.trim() || "New chat"
-}
 
 export function AppSidebar({
   threads,
   email,
   creating,
+  deleting,
   activeThreadId,
   onCreate,
+  onDelete,
   onSignOut,
 }: {
   threads: ChatThread[]
   email: string | null
   creating: boolean
+  deleting: boolean
   activeThreadId?: string
   onCreate: () => void
+  onDelete: (thread: ChatThread) => Promise<boolean>
   onSignOut: () => void
 }) {
   const { setOpenMobile, isMobile } = useSidebar()
   const groups = groupThreads(threads)
+  const [pending, setPending] = useState<ChatThread | null>(null)
 
   // On mobile the sidebar is an overlay — close it once the analyst picks a thread.
   function closeOnMobile() {
@@ -84,17 +93,14 @@ export function AppSidebar({
               <SidebarGroupContent>
                 <SidebarMenu>
                   {group.threads.map((thread) => (
-                    <SidebarMenuItem key={thread.id}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={thread.id === activeThreadId}
-                        tooltip={threadLabel(thread)}
-                      >
-                        <NavLink to={`/chats/${thread.id}`} onClick={closeOnMobile}>
-                          <span className="truncate">{threadLabel(thread)}</span>
-                        </NavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
+                    <ThreadItem
+                      key={thread.id}
+                      thread={thread}
+                      isActive={thread.id === activeThreadId}
+                      disabled={deleting}
+                      onSelect={closeOnMobile}
+                      onDelete={() => setPending(thread)}
+                    />
                   ))}
                 </SidebarMenu>
               </SidebarGroupContent>
@@ -107,6 +113,45 @@ export function AppSidebar({
         <UserMenu email={email} onSignOut={onSignOut} />
       </SidebarFooter>
       <SidebarRail />
+
+      <AlertDialog
+        open={pending !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleting) {
+            setPending(null)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this chat?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pending
+                ? `“${threadLabel(pending)}” and its messages will be permanently removed.`
+                : "This chat and its messages will be permanently removed."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              disabled={deleting || pending === null}
+              onClick={() => {
+                if (!pending) {
+                  return
+                }
+                void onDelete(pending).then((ok) => {
+                  if (ok) {
+                    setPending(null)
+                  }
+                })
+              }}
+            >
+              {deleting ? "Deleting…" : "Delete"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sidebar>
   )
 }

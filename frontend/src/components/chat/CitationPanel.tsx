@@ -11,6 +11,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { CitationExcerpt } from "@/components/chat/CitationExcerpt"
 import type { MessageCitation } from "@/lib/citations"
 
 type ActiveCitation = { citation: MessageCitation; index?: number }
@@ -64,6 +65,7 @@ export function CitationPanelProvider({ children }: { children: ReactNode }) {
                 <SheetDescription>
                   {active.citation.company_name}, filed{" "}
                   {formatFilingDate(active.citation.filing_date)}
+                  {active.citation.page != null ? ` · page ${active.citation.page}` : ""}
                 </SheetDescription>
               </SheetHeader>
 
@@ -75,9 +77,9 @@ export function CitationPanelProvider({ children }: { children: ReactNode }) {
                   </div>
                 ) : null}
                 <p className="text-xs font-medium text-muted-foreground">Cited passage</p>
-                <p className="mt-2 text-sm leading-relaxed whitespace-pre-wrap">
-                  {active.citation.excerpt}
-                </p>
+                <div className="mt-2">
+                  <CitationExcerpt excerpt={active.citation.excerpt} />
+                </div>
               </div>
 
               <SheetFooter className="border-t">

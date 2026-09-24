@@ -59,7 +59,7 @@ The most logical path is to build the backend first, then the frontend. The reas
 - [x] Add ingestion tests for parsing, chunking, and metadata integrity
 - [x] Use Markdown-style table serialization in chunks (not Docling triplet tables) for readable citation excerpts
 
-Corpus verified in Supabase (2026-09-21): **25** `source_documents`, **11,892** `document_chunks` (all with 1536-dim embeddings). Hybrid retrieval smoke-tested against live DB. **Note:** existing rows may still show triplet table noise until a controlled `chunk_and_embed --force` refresh (see README).
+Corpus verified in Supabase (2026-09-24): **25** `source_documents`, **7,013** `document_chunks` (all with 1536-dim embeddings, markdown table serialization). Hybrid retrieval smoke-tested against live DB.
 
 ## Phase 4: retrieval and grounding
 
@@ -116,24 +116,28 @@ Hybrid retrieval follows [ai-cookbook hybrid-retrieval](https://github.com/davee
 
 ## Phase 8: end-to-end validation against the client brief
 
+Runbook: [guides/pilot-validation.md](guides/pilot-validation.md). Batch smoke: `cd backend && uv run python smoke_assistant.py --brief-all`.
+
 - [ ] Test the core analyst questions from the brief with real corpus-backed answers
 - [ ] Confirm each answer includes precise filing and page citations (page may be absent on HTML-derived chunks)
 - [ ] Validate that the system refuses unsupported claims explicitly and clearly
-- [ ] Spot-check citation excerpts for readable table text after corpus refresh
+- [x] Spot-check citation excerpts for readable table text after corpus refresh
 - [ ] Check the experience for the pilot analyst group: trust, speed, and usefulness
 - [ ] Measure whether the workflow saves at least 3 hours per analyst per week
 - [ ] Review any gaps in retrieval quality or citation clarity before scaling out
 
 ## Phase 9: Railway deployment
 
-- [ ] Define Railway services: backend (Uvicorn on `$PORT`) and frontend (static `dist/` with SPA fallback)
-- [ ] Document production env matrix: backend `ALLOWED_ORIGINS`, Supabase keys, `DATABASE_URL`, OpenAI; frontend `VITE_*` at build time
+Guide: [guides/railway-deployment.md](guides/railway-deployment.md). Config: `backend/railway.toml`, `frontend/railway.toml`.
+
+- [x] Define Railway services: backend (Uvicorn on `$PORT`) and frontend (`dist/` via `vite preview` + SPA fallback)
+- [x] Document production env matrix: backend `ALLOWED_ORIGINS`, Supabase keys, `DATABASE_URL`, OpenAI; frontend `VITE_*` at build time
 - [ ] Configure Supabase Auth Site URL and redirect URLs for the production frontend origin
 - [ ] Run `alembic upgrade head` against the target Supabase project before traffic
 - [ ] Confirm corpus loaded in the target project (or run ingestion runbook)
-- [ ] Set health check to `/health`; optional `/health/ready` with DB ping
+- [x] Set health check to `/health`; optional `/health/ready` with DB ping
 - [ ] Smoke-test prod: sign-in, stream chat, citations, refusal path
-- [ ] Fill in root README “Running locally” with copy-paste commands (or link consolidated guide)
+- [x] Fill in root README “Running locally” with copy-paste commands (or link consolidated guide)
 
 ## Phase 10: launch readiness
 
@@ -141,7 +145,7 @@ Hybrid retrieval follows [ai-cookbook hybrid-retrieval](https://github.com/davee
 - [ ] Review security boundaries for auth, tokens, service-role usage, and DB connection role vs RLS
 - [ ] Add rate limiting on `/chat/stream` and auth-sensitive routes
 - [ ] Create runbooks for ingestion, app startup, corpus refresh, and incident response
-- [ ] Prepare a pilot rollout plan for 5 senior analysts
+- [x] Prepare a pilot rollout plan for 5 senior analysts (see [guides/pilot-validation.md](guides/pilot-validation.md))
 - [ ] Document known limitations and the explicit out-of-scope boundaries
 - [ ] CI: pytest + ruff + frontend `tsc` / lint on PRs
 
@@ -155,5 +159,9 @@ Practical recommendation — build in this order:
 6. Pilot validation (Phase 8)
 7. Deployment (Phase 9)
 8. Launch hardening (Phase 10)
+
+## v2 — Fundamentals Lab (separate repo)
+
+Decision and brief: [v2/README.md](v2/README.md), [v2/fundamentals-lab-brief.md](v2/fundamentals-lab-brief.md). Scaffold: [v2/scaffold-from-copilot.md](v2/scaffold-from-copilot.md), [../v2-scaffold/README.md](../v2-scaffold/README.md).
 
 This keeps the system grounded in the actual trust contract first and prevents the frontend from becoming a polished wrapper around a weak backend.

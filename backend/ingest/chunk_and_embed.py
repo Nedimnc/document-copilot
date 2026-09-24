@@ -189,11 +189,13 @@ async def chunk_and_embed(
                 tokenizer=chunker.tokenizer,
             )
             await add_chunks(session, rows)
+            # One filing per transaction so a later failure doesn't roll back
+            # hours of Docling + embedding work, and we don't hold a 25-doc lock.
+            await session.commit()
             counts["documents"] += 1
             counts["chunks"] += len(rows)
             print(f"wrote {len(rows)} chunks for {ticker} {accession}")
 
-        await session.commit()
     return counts
 
 

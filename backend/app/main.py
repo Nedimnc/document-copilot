@@ -1,9 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from app.api.auth import router as auth_router
 from app.api.chat import router as chat_router
 from app.config import settings
+from app.database.session import get_session_factory
 
 
 def create_app() -> FastAPI:
@@ -24,6 +26,13 @@ def create_app() -> FastAPI:
     @application.get("/health")
     async def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @application.get("/health/ready")
+    async def health_ready() -> dict[str, str]:
+        factory = get_session_factory()
+        async with factory() as session:
+            await session.execute(text("SELECT 1"))
+        return {"status": "ready"}
 
     application.include_router(auth_router)
     application.include_router(chat_router)

@@ -18,6 +18,7 @@ from app.chat.orchestrator import stream_chat_turn
 from app.chat.streaming import UI_MESSAGE_STREAM_HEADERS, format_sse
 from app.database.chats import (
     create_thread,
+    delete_thread,
     get_thread_by_id,
     list_citations_for_thread,
     list_messages,
@@ -115,6 +116,18 @@ async def post_thread(
         session, user_id=current_user.id, title=body.title
     )
     return _thread_response(thread)
+
+
+@router.delete("/threads/{thread_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_owned_thread(
+    thread_id: UUID,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> None:
+    await require_owned_thread(
+        session, user_id=current_user.id, thread_id=thread_id
+    )
+    await delete_thread(session, user_id=current_user.id, thread_id=thread_id)
 
 
 @router.get("/threads/{thread_id}/messages")

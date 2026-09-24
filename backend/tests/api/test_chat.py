@@ -78,6 +78,43 @@ def test_list_and_create_threads(valid_env):
     assert created.json()["title"] == "Filing question"
 
 
+def test_delete_thread_requires_auth(valid_env):
+    response = TestClient(create_app()).delete(f"/chat/threads/{THREAD_ID}")
+
+    assert response.status_code == 401
+
+
+def test_delete_thread_for_owner(valid_env):
+    with (
+        patch("app.api.chat.get_thread_by_id", AsyncMock(return_value=_thread())),
+        patch("app.api.chat.delete_thread", AsyncMock()) as delete_mock,
+    ):
+        response = _client().delete(f"/chat/threads/{THREAD_ID}")
+
+    assert response.status_code == 204
+    delete_mock.assert_awaited_once()
+    kwargs = delete_mock.await_args.kwargs
+    assert kwargs["user_id"] == USER_ID
+    assert kwargs["thread_id"] == THREAD_ID
+
+
+def test_delete_thread_404_when_missing(valid_env):
+    with patch("app.api.chat.get_thread_by_id", AsyncMock(return_value=None)):
+        response = _client().delete(f"/chat/threads/{THREAD_ID}")
+
+    assert response.status_code == 404
+
+
+def test_delete_thread_403_when_owned_by_someone_else(valid_env):
+    with patch(
+        "app.api.chat.get_thread_by_id",
+        AsyncMock(return_value=_thread(user_id=OTHER_USER_ID)),
+    ):
+        response = _client().delete(f"/chat/threads/{THREAD_ID}")
+
+    assert response.status_code == 403
+
+
 def test_messages_404_when_thread_missing(valid_env):
     with patch("app.api.chat.get_thread_by_id", AsyncMock(return_value=None)):
         response = _client().get(f"/chat/threads/{THREAD_ID}/messages")

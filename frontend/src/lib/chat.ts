@@ -9,6 +9,10 @@ export type ChatThread = {
   updated_at: string
 }
 
+export function threadLabel(thread: ChatThread): string {
+  return thread.title?.trim() || "New chat"
+}
+
 export type StoredChatMessage = {
   id: string
   role: "user" | "assistant" | "system"

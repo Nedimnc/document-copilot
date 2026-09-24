@@ -49,6 +49,16 @@ async def get_thread(
     return result.scalar_one_or_none()
 
 
+async def delete_thread(
+    session: AsyncSession, *, user_id: UUID, thread_id: UUID
+) -> None:
+    thread = await get_thread(session, user_id=user_id, thread_id=thread_id)
+    if thread is None:
+        raise LookupError("thread not found")
+    await session.delete(thread)
+    await session.flush()
+
+
 async def get_thread_by_id(
     session: AsyncSession, *, thread_id: UUID
 ) -> ChatThread | None:
