@@ -4,6 +4,12 @@ An internal AI chatbot that lets analysts query a corpus of documents in plain E
 
 ![Document Copilot chat: sidebar of conversations, a grounded NVIDIA answer with inline citations, and a collapsible Sources list](docs/assets/ui.png)
 
+## How it works
+
+An analyst drops a **10-K** (or we pull it from **EDGAR**) and that’s the last time anyone has to babysit the filing. **Docling** reads the HTML and **HybridChunker** cuts it into embedding-sized passages — we picked that over stuffing whole sections into the model because a 10-K is huge, and small chunks with their headings still attached are what search can actually hit. Tables are stored as **markdown** pipes on purpose: the default “row, col = value” flatten made citation excerpts unreadable, and analysts need years and line items, not shredded cells.
+
+Each chunk gets an **OpenAI** embedding and lands in **Postgres** (**pgvector** plus **full-text search**). When someone asks a question, we don’t hand the model the whole corpus. **Hybrid retrieval** runs semantic and keyword search, fuses the ranks with **RRF**, and only those passages go to the LLM (**PydanticAI** on OpenAI). It has to answer from that evidence and **cite** `[1]`, `[2]`; if it can’t, it **refuses** instead of guessing. Filing in, honest chunks, search, grounded answer out.
+
 ## The client
 
 **Driftwood Capital** — fictional independent investment research firm. Their analysts spend half their week reading 10-Ks and 10-Qs before they can produce any original analysis. Document Copilot eats that intake work so they can skip straight to insight.
